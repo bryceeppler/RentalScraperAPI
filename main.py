@@ -1,10 +1,24 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from scrapers.Craigslist import scrape_craigslist
-# from scrapers.Kijiji import scrape_kijiji
+from scrapers.Kijiji import scrape_kijiji
+import redis
+import os
+import dotenv
+import sys
+import json
+dotenv.load_dotenv()
 # from scrapers.UsedVictoria import scrape_used_victoria
 
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 class fetchInput(BaseModel):
@@ -13,7 +27,7 @@ class fetchInput(BaseModel):
     postedAfter: str
 
 
-
+rd = redis.Redis(host=os.environ['RD_HOST'], port=os.environ['RD_PORT'], password=os.environ['RD_PASSWORD'], db=0)
 
 @app.get("/")
 async def root():
@@ -37,13 +51,28 @@ async def fetch(inp: fetchInput):
     }]
     """
     try:
+        # print if cache not connected
+        if not rd.ping():
+            print("Cache not connected!")
+
+        if rd.exists('listings'):
+            print("Cache hit!")
+            return json.loads(rd.get('listings'))
+        print("Cache miss!")
+        
         craigslist_listings = await scrape_craigslist(inp.minPrice, inp.maxPrice)
         
-        # kijiji_listings = await scrape_kijiji(inp.minPrice, inp.maxPrice, inp.postedAfter)
+        kijiji_listings = await scrape_kijiji(inp.minPrice, inp.maxPrice)
         # used_listings = await scrape_used(inp.minPrice, inp.maxPrice, inp.postedAfter)
 
-        all_listings = craigslist_listings  # + kijiji_listings + used_listings
+        all_listings = craigslist_listings  + kijiji_listings #+ used_listings
+        # convert to json
 
-        return {"listings": all_listings}
+        rd.set('listings', json.dumps(all_listings))
+        rd.expire('listings', 60*60*24)
+        # all_listings = kijiji_listings
+
+        return all_listings
     except Exception as e:
+        print(f'Error on line {sys.exc_info()[-1].tb_lineno}, {type(e).__name__}, {e}')
         return {"error": str(e)}
