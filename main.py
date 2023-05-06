@@ -33,6 +33,14 @@ rd = redis.Redis(host=os.environ['RD_HOST'], port=os.environ['RD_PORT'], passwor
 async def root():
     return {"message": "Hello World. Welcome to FastAPI!"}
 
+@app.get("/all")
+async def all():
+    if not rd.ping():
+        return {"error": "Cache not connected!"}
+    if rd.exists('listings'):
+        return json.loads(rd.get('listings'))
+    return {"error": "Cache miss!"}
+
 
 @app.post("/fetch")
 async def fetch(inp: fetchInput):

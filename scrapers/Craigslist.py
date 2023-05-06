@@ -12,7 +12,7 @@ async def scrape_craigslist(min_price: int, max_price: int) -> List[dict]:
 
     async with async_playwright() as p:
         try:
-            browser = await p.chromium.launch(headless=False)
+            browser = await p.chromium.launch()
             context = await browser.new_context()
             page = await context.new_page()
 
