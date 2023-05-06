@@ -6,11 +6,12 @@ from scrapers.Craigslist import scrape_craigslist
 from scrapers.Kijiji import scrape_kijiji
 import redis
 import os
+import asyncio
 import dotenv
 import sys
 import json
 dotenv.load_dotenv()
-# from scrapers.UsedVictoria import scrape_used_victoria
+from scrapers.UsedVictoria import scrape_used_victoria
 
 app = FastAPI()
 app.add_middleware(
@@ -31,24 +32,33 @@ class fetchInput(BaseModel):
 rd = redis.Redis(host=os.environ['RD_HOST'], port=os.environ['RD_PORT'], password=os.environ['RD_PASSWORD'], db=0)
 
 
-from typing import Callable
-
 async def scrape_listings(min_price: int, max_price: int):
     try:
         print("Background scraping task started...")
-        craigslist_listings = await scrape_craigslist(min_price, max_price)
-        kijiji_listings = await scrape_kijiji(min_price, max_price)
+        
+        tasks = [
+            scrape_craigslist(min_price, max_price),
+            scrape_kijiji(min_price, max_price),
+            scrape_used_victoria(min_price, max_price),
+        ]
+        
+        results = await asyncio.gather(*tasks)
+        
+        craigslist_listings, kijiji_listings, used_victoria_listings = results
 
         print("Scraping task completed...")
 
-        all_listings = craigslist_listings + kijiji_listings
+        all_listings = craigslist_listings + kijiji_listings + used_victoria_listings
+        
         all_listings.sort(key=lambda x: x['posted_at'], reverse=True)
 
         rd.set('listings', json.dumps(all_listings))
         rd.expire('listings', 60 * 60 * 24)
         print("Cache updated...")
+        return all_listings
     except Exception as e:
         print(f'Error on line {sys.exc_info()[-1].tb_lineno}, {type(e).__name__}, {e}')
+
 
 
 
@@ -100,3 +110,8 @@ async def craigslist():
 async def kijiji():
     # test the kijiji scraper and return the results
     return await scrape_kijiji(1000, 1100)
+
+@app.get("/usedvictoria")
+async def usedvictoria():
+    # test the usedvictoria scraper and return the results
+    return await scrape_used_victoria(1500, 3000)

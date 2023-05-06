@@ -46,7 +46,11 @@ async def scrape_kijiji(min_price: int, max_price: int) -> List[dict]:
             tasks = [fetch_url(session, link, headers) for link in listing_links]
             pages = await asyncio.gather(*tasks)
 
+        # i = 0
         for page_text, link in zip(pages, listing_links):
+            # if i > 2:
+            #     break
+            # i += 1
             # Add a random delay between requests
             await asyncio.sleep(random.uniform(1, 2))
 
