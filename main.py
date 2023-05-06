@@ -66,6 +66,8 @@ async def fetch(inp: fetchInput):
         # used_listings = await scrape_used(inp.minPrice, inp.maxPrice, inp.postedAfter)
 
         all_listings = craigslist_listings  + kijiji_listings #+ used_listings
+        # sort by descending date
+        all_listings.sort(key=lambda x: x['posted_at'], reverse=True)
         # convert to json
 
         rd.set('listings', json.dumps(all_listings))

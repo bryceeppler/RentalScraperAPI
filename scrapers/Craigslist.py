@@ -39,7 +39,7 @@ async def scrape_craigslist(min_price: int, max_price: int) -> List[dict]:
             print(e)
             print(f' Error on line {sys.exc_info()[-1].tb_lineno}')
 
-    for link in post_links[:5]:
+    for link in post_links:
         async with httpx.AsyncClient() as client:
             response = await client.get(link)
         

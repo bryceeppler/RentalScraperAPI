@@ -41,7 +41,7 @@ async def scrape_kijiji(min_price: int, max_price: int) -> List[dict]:
         async with async_playwright() as p:
             browser = await p.chromium.launch()
 
-            for link in listing_links[:5]:
+            for link in listing_links:
                 # DELAY
                 await asyncio.sleep(random.uniform(1, 2))
 
