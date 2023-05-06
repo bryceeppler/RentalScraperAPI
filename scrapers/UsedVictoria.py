@@ -38,6 +38,7 @@ async def get_listings_from_page(url: str) -> List[str]:
     return listing_urls
 
 async def scrape_used_victoria(min_price: int, max_price: int) -> List[dict]:
+    # https://www.usedvictoria.com/real-estate-rentals?lat=48.480204398955145&lon=-123.39843750000001&ca=%7B%227%22%3A%5B%222%22,null%5D%7D&radius=20&priceTo={max_price}&priceFrom={min_price}&xflags=wanted
     base_url = f"https://www.usedvictoria.com/real-estate-rentals?r=greatervictoria&ca=%7B%227%22%3A%5B%222%22,null%5D%7D&priceTo={max_price}&priceFrom={min_price}&xflags=wanted"
     listings = []
     post_links = []
@@ -46,6 +47,9 @@ async def scrape_used_victoria(min_price: int, max_price: int) -> List[dict]:
 
         # Get the first page links
         post_links.extend(await get_listings_from_page(base_url))
+
+        # ensure no duplicates
+        post_links = list(set(post_links))
 
 
         # Get the second page links
