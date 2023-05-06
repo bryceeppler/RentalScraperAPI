@@ -83,3 +83,8 @@ async def fetch(inp: fetchInput, background_tasks: BackgroundTasks):
     """
     background_tasks.add_task(scrape_listings, inp.minPrice, inp.maxPrice)
     return {"message": "task started"}
+
+@app.get("/craigslist")
+async def craigslist():
+    # test the craiglist scraper and return the results
+    return await scrape_craigslist(1000, 1400)

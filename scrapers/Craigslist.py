@@ -1,8 +1,13 @@
 from typing import List
 from playwright.async_api import async_playwright
 import sys
-import httpx
+import asyncio
 from bs4 import BeautifulSoup
+import aiohttp
+
+async def fetch_url(session, url):
+    async with session.get(url) as response:
+        return await response.text()
 
 async def scrape_craigslist(min_price: int, max_price: int) -> List[dict]:
     url = f"https://victoria.craigslist.org/search/victoria-bc/apa?hasPic=1&lat=48.4272&lon=-123.359&max_price={max_price}&minSqft=800&min_bedrooms=2&min_price={min_price}&search_distance=3.3#search=1~gallery~0~0"
@@ -39,11 +44,12 @@ async def scrape_craigslist(min_price: int, max_price: int) -> List[dict]:
             print(e)
             print(f' Error on line {sys.exc_info()[-1].tb_lineno}')
 
-    for link in post_links:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(link)
-        
-        soup = BeautifulSoup(response.text, 'lxml')
+    async with aiohttp.ClientSession() as session:
+        tasks = [fetch_url(session, link) for link in post_links]
+        pages = await asyncio.gather(*tasks)
+
+    for page_text in pages:
+        soup = BeautifulSoup(page_text, 'lxml')
 
         title = soup.select_one('#titletextonly').text
         price = soup.select_one('.price').text
