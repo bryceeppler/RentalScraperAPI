@@ -48,6 +48,12 @@ async def scrape_listings(min_price: int, max_price: int):
 
         print("Scraping task completed...")
 
+        print(f"Found {len(craigslist_listings)} craigslist listings")
+        print(f"Found {len(kijiji_listings)} kijiji listings")
+        print(f"Found {len(used_victoria_listings)} used victoria listings")
+
+        
+
         all_listings = craigslist_listings + kijiji_listings + used_victoria_listings
         
         all_listings.sort(key=lambda x: x['posted_at'], reverse=True)
@@ -115,3 +121,68 @@ async def kijiji():
 async def usedvictoria():
     # test the usedvictoria scraper and return the results
     return await scrape_used_victoria(1500, 3000)
+
+###########################################################################################
+
+from shapely.geometry import Point, Polygon
+from geopy.geocoders import Nominatim
+from typing import List
+
+def filter_addresses_within_polygon(addresses: List[str], polygon: Polygon) -> List[str]:
+    print("Filtering addresses...")
+    geolocator = Nominatim(user_agent="myGeocoder", timeout=10)
+    filtered_addresses = []
+    for address in addresses:
+        print(f"check address {address}")        
+        location = geolocator.geocode(address)
+        # location = geolocator.geocode("1463 Westall Ave, Victoria")
+        if location:
+            print(f"location found for {address}")
+            point = Point(location.longitude, location.latitude)
+            print(f"Longitude: {location.longitude} Latitude: {location.latitude}")
+            if polygon.contains(point):
+                filtered_addresses.append(address)
+
+    return filtered_addresses
+
+@app.get("/region")
+async def region():
+    # retrieve data from redis
+    if not rd.ping():
+        return {"error": "Cache not connected!"}
+    if rd.exists('listings'):
+        listings = json.loads(rd.get('listings'))
+    else:
+        return {"error": "Cache miss!"}
+
+    # Define your polygon as a list of (longitude, latitude) coordinates
+    polygon_coordinates = [
+        (-123.407087, 48.452147),
+        (-123.353053, 48.446498),
+        (-123.353634, 48.422493),
+        (-123.337927, 48.418935),
+        (-123.320437, 48.422765),
+        (-123.320332, 48.435907),
+        (-123.310976, 48.445955),
+        (-123.311128, 48.462621),
+        (-123.259029, 48.459989),
+        (-123.258018, 48.404635),
+        (-123.394766, 48.402825),
+    ]
+
+    polygon = Polygon(polygon_coordinates)
+
+
+    addresses = [
+        "1463 Westall Ave, Victoria", # OUTSIDE POLYGON
+        "1001 Terrace Ave, Victoria", # OUTSIDE POLYGON
+        "628 Transit Rd, Victoria", # INSIDE POLYGON
+        "395 Tyee Rd, Victoria", # INSIDE POLYGON
+        "2464 Central Ave, Victoria", # INSIDE
+        '218 Wildwood Ave, Victoria', # INSIDE
+        '610 Dunedin St, Victoria', # INSIDE ON GORGE
+    ]
+
+    filtered_addresses = filter_addresses_within_polygon(addresses, polygon)
+    print(filtered_addresses)
+    return filtered_addresses
