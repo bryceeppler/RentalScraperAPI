@@ -63,10 +63,10 @@ async def fetch(inp: fetchInput):
         if not rd.ping():
             print("Cache not connected!")
 
-        if rd.exists('listings'):
-            print("Cache hit!")
-            return json.loads(rd.get('listings'))
-        print("Cache miss!")
+        # if rd.exists('listings'):
+        #     print("Cache hit!")
+        #     return json.loads(rd.get('listings'))
+        # print("Cache miss!")
         
         craigslist_listings = await scrape_craigslist(inp.minPrice, inp.maxPrice)
         
