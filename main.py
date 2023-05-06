@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi import BackgroundTasks
 from pydantic import BaseModel
 from scrapers.Craigslist import scrape_craigslist
 from scrapers.Kijiji import scrape_kijiji
@@ -29,6 +30,28 @@ class fetchInput(BaseModel):
 
 rd = redis.Redis(host=os.environ['RD_HOST'], port=os.environ['RD_PORT'], password=os.environ['RD_PASSWORD'], db=0)
 
+
+from typing import Callable
+
+async def scrape_listings(min_price: int, max_price: int):
+    try:
+        print("Background scraping task started...")
+        craigslist_listings = await scrape_craigslist(min_price, max_price)
+        kijiji_listings = await scrape_kijiji(min_price, max_price)
+
+        print("Scraping task completed...")
+
+        all_listings = craigslist_listings + kijiji_listings
+        all_listings.sort(key=lambda x: x['posted_at'], reverse=True)
+
+        rd.set('listings', json.dumps(all_listings))
+        rd.expire('listings', 60 * 60 * 24)
+        print("Cache updated...")
+    except Exception as e:
+        print(f'Error on line {sys.exc_info()[-1].tb_lineno}, {type(e).__name__}, {e}')
+
+
+
 @app.get("/")
 async def root():
     return {"message": "Hello World. Welcome to FastAPI!"}
@@ -43,7 +66,7 @@ async def all():
 
 
 @app.post("/fetch")
-async def fetch(inp: fetchInput):
+async def fetch(inp: fetchInput, background_tasks: BackgroundTasks):
     """
     This endpoint will execute the web scrapers for Kijiji, Craigslist and Used.ca
 
@@ -58,31 +81,5 @@ async def fetch(inp: fetchInput):
         "postedAt": "date the ad was posted"
     }]
     """
-    try:
-        # print if cache not connected
-        if not rd.ping():
-            print("Cache not connected!")
-
-        # if rd.exists('listings'):
-        #     print("Cache hit!")
-        #     return json.loads(rd.get('listings'))
-        # print("Cache miss!")
-        
-        craigslist_listings = await scrape_craigslist(inp.minPrice, inp.maxPrice)
-        
-        kijiji_listings = await scrape_kijiji(inp.minPrice, inp.maxPrice)
-        # used_listings = await scrape_used(inp.minPrice, inp.maxPrice, inp.postedAfter)
-
-        all_listings = craigslist_listings  + kijiji_listings #+ used_listings
-        # sort by descending date
-        all_listings.sort(key=lambda x: x['posted_at'], reverse=True)
-        # convert to json
-
-        rd.set('listings', json.dumps(all_listings))
-        rd.expire('listings', 60*60*24)
-        # all_listings = kijiji_listings
-
-        return all_listings
-    except Exception as e:
-        print(f'Error on line {sys.exc_info()[-1].tb_lineno}, {type(e).__name__}, {e}')
-        return {"error": str(e)}
+    background_tasks.add_task(scrape_listings, inp.minPrice, inp.maxPrice)
+    return {"message": "task started"}
