@@ -88,3 +88,8 @@ async def fetch(inp: fetchInput, background_tasks: BackgroundTasks):
 async def craigslist():
     # test the craiglist scraper and return the results
     return await scrape_craigslist(1000, 1400)
+
+@app.get("/kijiji")
+async def kijiji():
+    # test the kijiji scraper and return the results
+    return await scrape_kijiji(1000, 1100)
