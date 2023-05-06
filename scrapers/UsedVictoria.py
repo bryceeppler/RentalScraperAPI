@@ -47,7 +47,6 @@ async def scrape_used_victoria(min_price: int, max_price: int) -> List[dict]:
         # Get the first page links
         post_links.extend(await get_listings_from_page(base_url))
 
-        print(f"Found {len(post_links)} listings on the first page.")
 
         # Get the second page links
         async with aiohttp.ClientSession() as session:
@@ -58,7 +57,6 @@ async def scrape_used_victoria(min_price: int, max_price: int) -> List[dict]:
             next_page_url = "https://www.usedvictoria.com" + next_page_element["href"]
             post_links.extend(await get_listings_from_page(next_page_url))
 
-        print(f"Found {len(post_links)} listings on the second page.")
 
     except Exception as e:
         print(f'Error on line {sys.exc_info()[-1].tb_lineno}, {type(e).__name__}, {e}')
@@ -83,7 +81,6 @@ async def scrape_used_victoria(min_price: int, max_price: int) -> List[dict]:
             title_pattern = r"^\$\d+(?:,\d{3})*\s*[··]\s*(.+)$"  # Matches titles after price and separator
             title = re.search(title_pattern, full_title).group(1)
 
-            print(f"Scraping listing: {title} for ${price}")
             # get image container using xpath
             # //*[@id="used-content"]/div/div/div[1]/div[1]/div[1]/div[2]
             # image_container = 
@@ -92,19 +89,17 @@ async def scrape_used_victoria(min_price: int, max_price: int) -> List[dict]:
             images = [img["src"] for img in image_elements]
             location = None
 
-            # renewed date
-            renewed_at = soup.select_one('#used-content > div > div > div.row.justify-content-center.justify-content-lg-between > div.two-column-content.col-12.col-lg-auto > div.row.ad-view-container.mb-4 > div.adview-detail-content.p-lg-3 > div.container.adview-ad-details.rounded.mb-4 > div.row.adview-ad-details-sub.flex-lg-nowrap > div.mr-3.p-3.p-lg-0.col-12.col-lg-7 > div:nth-child(3) > div.col-3.labels.text-700.text-uppercase.text-xs.text-right.pr-2.pt-1')
-            if 'Renewed' in renewed_at:
-                posted_at = renewed_at.text.strip()
+            date_elements = soup.select('div.container.adview-ad-details.rounded.mb-4 > div.row.adview-ad-details-sub.flex-lg-nowrap > div.mr-3.p-3.p-lg-0.col-12.col-lg-7 > div')
+            for d in date_elements:
+                if 'Posted' in d.text:
+                    posted_at = convert_posted_at(d.text.strip().replace('Posted', ''))
+                    break
+            # get posted at
 
-            else:
-                posted_at = soup.select_one('#used-content > div > div > div.row.justify-content-center.justify-content-lg-between > div.two-column-content.col-12.col-lg-auto > div.row.ad-view-container.mb-4 > div.adview-detail-content.p-lg-3 > div.container.adview-ad-details.rounded.mb-4 > div.row.adview-ad-details-sub.flex-lg-nowrap > div.mr-3.p-3.p-lg-0.col-12.col-lg-7 > div:nth-child(2) > div.col-3.labels.text-700.text-uppercase.text-xs.text-right.pr-2.pt-1')
-                posted_at = posted_at.text.strip()
-
-            posted_at = soup.select_one("#used-content > div > div > div.row.justify-content-center.justify-content-lg-between > div.two-column-content.col-12.col-lg-auto > div.row.ad-view-container.mb-4 > div.adview-detail-content.p-lg-3 > div.container.adview-ad-details.rounded.mb-4 > div.row.adview-ad-details-sub.flex-lg-nowrap > div.mr-3.p-3.p-lg-0.col-12.col-lg-7 > div:nth-child(3) > div.col-9.bg-white.text-sm.px-2.pt-1 > span").text.strip()
+            # posted_at = soup.select_one("#used-content > div > div > div.row.justify-content-center.justify-content-lg-between > div.two-column-content.col-12.col-lg-auto > div.row.ad-view-container.mb-4 > div.adview-detail-content.p-lg-3 > div.container.adview-ad-details.rounded.mb-4 > div.row.adview-ad-details-sub.flex-lg-nowrap > div.mr-3.p-3.p-lg-0.col-12.col-lg-7 > div:nth-child(3) > div.col-9.bg-white.text-sm.px-2.pt-1 > span").text.strip()
             # convert date to datetime object
             # convert 2021-03-01 to a string 2023-03-22T12:57:12-0700 with default 00:00:00 time like this 2023-03-22T00:00:00-0700
-            posted_at_string = convert_posted_at(posted_at)
+            # posted_at_string = convert_posted_at(posted_at)
 
             description = soup.select_one('#used-content > div > div > div.row.justify-content-center.justify-content-lg-between > div.two-column-content.col-12.col-lg-auto > div.row.ad-view-container.mb-4 > div.adview-detail-content.p-lg-3 > div.container.adview-ad-details.rounded.mb-4 > div.row.mb-4.p-3.bg-white.rounded.d-block > p').text.strip()
 
@@ -113,7 +108,7 @@ async def scrape_used_victoria(min_price: int, max_price: int) -> List[dict]:
                 "price": float(price),
                 "link": link,
                 "location": location,
-                "posted_at": posted_at_string,
+                "posted_at": posted_at,
                 "images": images,
                 "description": description
             })
