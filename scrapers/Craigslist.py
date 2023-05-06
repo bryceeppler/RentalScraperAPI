@@ -48,7 +48,8 @@ async def scrape_craigslist(min_price: int, max_price: int) -> List[dict]:
         tasks = [fetch_url(session, link) for link in post_links]
         pages = await asyncio.gather(*tasks)
 
-    for page_text in pages:
+    for link, page_text in zip(post_links, pages):
+
         soup = BeautifulSoup(page_text, 'lxml')
 
         title = soup.select_one('#titletextonly').text
