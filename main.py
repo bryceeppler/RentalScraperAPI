@@ -135,7 +135,6 @@ def filter_addresses_within_polygon(addresses: List[str], polygon: Polygon) -> L
     for address in addresses:
         print(f"check address {address}")        
         location = geolocator.geocode(address)
-        # location = geolocator.geocode("1463 Westall Ave, Victoria")
         if location:
             print(f"location found for {address}")
             point = Point(location.longitude, location.latitude)
@@ -157,31 +156,37 @@ async def region():
 
     # Define your polygon as a list of (longitude, latitude) coordinates
     polygon_coordinates = [
-        (-123.407087, 48.452147),
-        (-123.353053, 48.446498),
-        (-123.353634, 48.422493),
-        (-123.337927, 48.418935),
-        (-123.320437, 48.422765),
-        (-123.320332, 48.435907),
-        (-123.310976, 48.445955),
-        (-123.311128, 48.462621),
-        (-123.259029, 48.459989),
-        (-123.258018, 48.404635),
-        (-123.394766, 48.402825),
+(-123.416875, 48.454496),
+(-123.377981, 48.452034),
+(-123.356446, 48.439739),
+(-123.355501, 48.417981),  
+(-123.317303, 48.420317),
+(-123.321145, 48.478886),
+(-123.236606, 48.484395),
+(-123.235079, 48.387400),
+(-123.418772, 48.393485),
     ]
+
+
 
     polygon = Polygon(polygon_coordinates)
 
+    addresses = []
+    for listing in listings:
+        if listing['location']:
+            addresses.append(listing['location'])
+            print(listing['location'])
 
-    addresses = [
-        "1463 Westall Ave, Victoria", # OUTSIDE POLYGON
-        "1001 Terrace Ave, Victoria", # OUTSIDE POLYGON
-        "628 Transit Rd, Victoria", # INSIDE POLYGON
-        "395 Tyee Rd, Victoria", # INSIDE POLYGON
-        "2464 Central Ave, Victoria", # INSIDE
-        '218 Wildwood Ave, Victoria', # INSIDE
-        '610 Dunedin St, Victoria', # INSIDE ON GORGE
-    ]
+    # addresses = [
+    #     "1463 Westall Ave, Victoria", # OUTSIDE POLYGON
+    #     "1001 Terrace Ave, Victoria", # OUTSIDE POLYGON
+    #     "628 Transit Rd, Victoria", # INSIDE POLYGON
+    #     "395 Tyee Rd, Victoria", # INSIDE POLYGON
+    #     "2464 Central Ave, Victoria", # INSIDE
+    #     '218 Wildwood Ave, Victoria', # INSIDE
+    #     '610 Dunedin St, Victoria', # INSIDE ON GORGE
+    #     '1266 Newport Ave, Victoria', # INSIDE
+    # ]
 
     filtered_addresses = filter_addresses_within_polygon(addresses, polygon)
     print(filtered_addresses)
