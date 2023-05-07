@@ -4,6 +4,7 @@ import sys
 import asyncio
 from bs4 import BeautifulSoup
 import aiohttp
+import random
 
 async def fetch_url(session, url):
     async with session.get(url) as response:
@@ -53,7 +54,6 @@ async def scrape_craigslist(min_price: int, max_price: int) -> List[dict]:
         # if i > 5:
         #     break
         # i += 1
-
         soup = BeautifulSoup(page_text, 'lxml')
 
         title = soup.select_one('#titletextonly').text

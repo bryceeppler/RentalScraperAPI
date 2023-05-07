@@ -51,8 +51,6 @@ async def scrape_kijiji(min_price: int, max_price: int) -> List[dict]:
             # if i > 2:
             #     break
             # i += 1
-            # Add a random delay between requests
-            await asyncio.sleep(random.uniform(1, 2))
 
             soup = BeautifulSoup(page_text, 'lxml')
 

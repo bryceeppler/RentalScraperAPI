@@ -10,6 +10,10 @@ import asyncio
 import dotenv
 import sys
 import json
+from shapely.geometry import Point, Polygon
+from geopy.geocoders import Nominatim
+from send_email import send_email
+from typing import List
 dotenv.load_dotenv()
 from scrapers.UsedVictoria import scrape_used_victoria
 
@@ -35,11 +39,12 @@ rd = redis.Redis(host=os.environ['RD_HOST'], port=os.environ['RD_PORT'], passwor
 async def scrape_listings(min_price: int, max_price: int):
     try:
         print("Background scraping task started...")
-        
+        fixed_max_price = 2700
+        fixed_min_price = 1500
         tasks = [
-            scrape_craigslist(min_price, max_price),
-            scrape_kijiji(min_price, max_price),
-            scrape_used_victoria(min_price, max_price),
+            scrape_craigslist(fixed_min_price, fixed_max_price),
+            scrape_kijiji(fixed_min_price, fixed_max_price),
+            scrape_used_victoria(fixed_min_price, fixed_max_price),
         ]
         
         results = await asyncio.gather(*tasks)
@@ -61,11 +66,12 @@ async def scrape_listings(min_price: int, max_price: int):
         rd.set('listings', json.dumps(all_listings))
         rd.expire('listings', 60 * 60 * 24)
         print("Cache updated...")
+
+        # check region and send email if necessary
+        await region()
         return all_listings
     except Exception as e:
         print(f'Error on line {sys.exc_info()[-1].tb_lineno}, {type(e).__name__}, {e}')
-
-
 
 
 @app.get("/")
@@ -124,9 +130,6 @@ async def usedvictoria():
 
 ###########################################################################################
 
-from shapely.geometry import Point, Polygon
-from geopy.geocoders import Nominatim
-from typing import List
 
 def filter_addresses_within_polygon(addresses: List[str], polygon: Polygon) -> List[str]:
     print("Filtering addresses...")
@@ -144,30 +147,31 @@ def filter_addresses_within_polygon(addresses: List[str], polygon: Polygon) -> L
 
     return filtered_addresses
 
-@app.get("/region")
+# @app.get("/region")
 async def region():
-    # retrieve data from redis
     if not rd.ping():
         return {"error": "Cache not connected!"}
     if rd.exists('listings'):
         listings = json.loads(rd.get('listings'))
     else:
         return {"error": "Cache miss!"}
+    
+    if rd.exists('already_sent'):
+        already_sent = json.loads(rd.get('already_sent')) # list of links that have already been sent
+        # remove any listings from listings that have a link in already_sent
+        listings = [listing for listing in listings if listing['link'] not in already_sent]
 
-    # Define your polygon as a list of (longitude, latitude) coordinates
     polygon_coordinates = [
-(-123.416875, 48.454496),
-(-123.377981, 48.452034),
-(-123.356446, 48.439739),
-(-123.355501, 48.417981),  
-(-123.317303, 48.420317),
-(-123.321145, 48.478886),
-(-123.236606, 48.484395),
-(-123.235079, 48.387400),
-(-123.418772, 48.393485),
+        (-123.416875, 48.454496),
+        (-123.377981, 48.452034),
+        (-123.356446, 48.439739),
+        (-123.355501, 48.417981),  
+        (-123.317303, 48.420317),
+        (-123.321145, 48.478886),
+        (-123.236606, 48.484395),
+        (-123.235079, 48.387400),
+        (-123.418772, 48.393485),
     ]
-
-
 
     polygon = Polygon(polygon_coordinates)
 
@@ -177,17 +181,32 @@ async def region():
             addresses.append(listing['location'])
             print(listing['location'])
 
-    # addresses = [
-    #     "1463 Westall Ave, Victoria", # OUTSIDE POLYGON
-    #     "1001 Terrace Ave, Victoria", # OUTSIDE POLYGON
-    #     "628 Transit Rd, Victoria", # INSIDE POLYGON
-    #     "395 Tyee Rd, Victoria", # INSIDE POLYGON
-    #     "2464 Central Ave, Victoria", # INSIDE
-    #     '218 Wildwood Ave, Victoria', # INSIDE
-    #     '610 Dunedin St, Victoria', # INSIDE ON GORGE
-    #     '1266 Newport Ave, Victoria', # INSIDE
-    # ]
-
     filtered_addresses = filter_addresses_within_polygon(addresses, polygon)
     print(filtered_addresses)
-    return filtered_addresses
+
+    filtered_listings = []
+    for listing in listings:
+        if listing['location'] in filtered_addresses:
+            filtered_listings.append(listing)
+
+    # send email to user
+    if len(filtered_listings) > 0:
+        await send_email(filtered_listings, ['eppler97@gmail.com'])
+
+
+    # add links to already_sent
+    if rd.exists('already_sent'):
+        already_sent = json.loads(rd.get('already_sent'))
+        already_sent.extend([listing['link'] for listing in listings])
+        rd.set('already_sent', json.dumps(already_sent))
+        # set to never expire
+        rd.persist('already_sent')
+    else:
+        rd.set('already_sent', json.dumps([listing['link'] for listing in listings]))
+        # set to never expire
+        rd.persist('already_sent')
+
+
+
+
+    return filtered_listings
